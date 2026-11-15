@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111411">
+  <meta name="description" content="Preview, repair, and download smoother video loops. Local processing, no uploads.">
+  <title>Loopcheck — Find the seam.</title>
+  <link rel="stylesheet" href="styles.css?v=audit-fixes-1">
+  <script type="module" src="app.js?v=audit-fixes-1"></script>
+</head>
+<body>
+  <main>
+    <header><a class="wordmark" href="./" aria-label="Loopcheck home"><span aria-hidden="true">↻</span> loopcheck</a><span class="local"><i></i> Local only</span></header>
+    <section class="intro"><p class="eyebrow">THE LOOP WORKSHOP</p><h1>Soften the seam.<br><span>Keep the moment.</span></h1><p>Blend the ending into the beginning.<br>Preview the difference. Keep the loop.</p></section>
+    <section class="workspace" aria-label="Video loop checker">
+      <div id="dropzone" class="stage">
+        <div id="empty" class="empty"><span class="loop-icon" aria-hidden="true">↻</span><h2>Your next endless moment.</h2><p>Drop a video here, or choose one from your device.</p><label class="button primary" for="file">Choose a video <span aria-hidden="true">↗</span></label><p class="hint">Stays on your device. Never uploaded.</p></div>
+        <canvas id="video" hidden role="img" aria-label="Selected video loop preview"></canvas>
+        <button id="exit-fullscreen" class="exit-fullscreen" type="button" hidden style="display:none">Exit fullscreen</button>
+        <div id="loading" class="loading" hidden>Loading video…</div>
+      </div>
+      <input id="file" type="file" accept="video/*" class="file-input">
+      <div id="controls" class="controls" hidden>
+        <div class="file-info"><span class="status-dot" aria-hidden="true"></span><span id="filename"></span><span id="duration"></span></div>
+        <div class="buttons"><button id="play" type="button">Play</button><button id="mute" type="button" aria-pressed="false">Mute</button><button id="fullscreen" type="button" aria-pressed="false">Fullscreen</button><label class="button replace" for="file">Change video</label></div>
+      </div>
+      <section id="editor" class="editor" aria-label="Loop repair" hidden>
+        <div class="editor-heading"><div><p class="eyebrow">MAKE THE JOIN</p><h2>A little overlap. A smoother loop.</h2></div><div class="comparison" role="group" aria-label="Preview version"><button id="original" type="button" aria-pressed="false">Original</button><button id="repaired" type="button" aria-pressed="true">Repaired</button></div></div>
+        <fieldset id="repair-settings">
+          <div class="blend-setting"><label for="overlap">Picture + sound blend <output id="overlap-value" for="overlap">250 ms</output></label><input id="overlap" type="range" min="0" max="2000" value="250" step="10" aria-describedby="blend-help"><p id="blend-help">A short dissolve softens noise differences. Longer blends can show double images on moving objects. Set to 0 to disable.</p></div>
+          <div class="audio-settings"><label for="audio-curve">Audio crossfade</label><select id="audio-curve"><option value="equal-power">Constant power · ambience</option><option value="linear">Linear · similar sound</option></select><label class="check-label"><input id="trim-silence" type="checkbox"> Remove detected quiet edges <span>(cuts picture too)</span></label><p id="audio-diagnostic"></p></div>
+        </fieldset>
+        <p id="repair-info" class="repair-info"></p>
+        <div class="export-row"><button id="preview-join" type="button">Play across the join ↻</button><div class="download-actions"><button id="export" class="primary" type="button">Prepare download ↗</button><button id="cancel-export" type="button" hidden>Cancel</button><a id="download" class="button primary" hidden>Download repaired video ↓</a></div></div>
+        <p id="export-spec" class="quality"></p><p id="export-status" class="message" role="status" aria-live="polite"></p>
+      </section>
+      <p id="quality" class="quality"></p>
+      <p id="message" class="message" role="status" aria-live="polite"></p>
+    </section>
+    <footer><span>Your footage. A smoother way around.</span><details><summary>About the loop</summary><p>The full clip is decoded before playback. Cached frames follow a continuous audio clock; audio loops in one buffer, without restarting a media player. Compare the original with an end-to-start dissolve and audio crossfade. Repairs shorten the clip by the overlap length. Optional quiet-edge removal cuts picture and audio together; it may remove intentional silence. Clips must be 30 seconds or shorter and fit a 128 MB decoded cache. Preview resolution may be reduced. Downloads re-encode at the original resolution (rounded up to even dimensions), with a base cadence up to 60 fps and extra dissolve frames, using MP4 or WebM according to browser encoding support. Source metadata and extra tracks are not retained. A dissolve may show ghosting; missing sound cannot be reconstructed. Exported codec padding or another player can still affect looping. Display refresh, device load, and silence already encoded in the file can still affect your test. Playback pauses when this page is hidden.</p><p>Decoder: Mediabunny 1.66.0 · <a href="vendor/MEDIABUNNY-LICENSE.txt">MPL 2.0 license</a> · <a href="vendor/mediabunny-1.66.0-source.tar.gz" download>Decoder source</a></p></details></footer>
+  </main>
+</body>
+</html>
