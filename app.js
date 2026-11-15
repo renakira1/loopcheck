@@ -1,8 +1,8 @@
 import { Input, BlobSource, ALL_FORMATS, CanvasSink, AudioBufferSink } from './vendor/mediabunny-1.66.0.min.mjs';
-import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=export-recovery-1';
+import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=software-export-1';
 
-import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=export-recovery-1';
-import { exportLoop } from './export-video.mjs?v=export-recovery-1';
+import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=software-export-1';
+import { exportLoop } from './export-video.mjs?v=software-export-1';
 
 const $ = selector => document.querySelector(selector);
 const fileInput = $('#file');
@@ -379,7 +379,7 @@ $('#export').addEventListener('click', async () => {
     $('#download').href = downloadUrl;
     $('#download').download = `${prepared.file.name.replace(/\.[^.]+$/, '')}-repaired.${result.extension.replace(/^\./, '')}`;
     $('#download').hidden = false;
-    $('#export-status').textContent = `Ready: ${repairedPlan.duration.toFixed(2)}s · ${result.width} × ${result.height} · ${(result.blob.size / 1024 / 1024).toFixed(1)} MB. Download and re-open it to check the encoded result.`;
+    $('#export-status').textContent = `Ready: ${repairedPlan.duration.toFixed(2)}s · ${result.width} × ${result.height} · ${(result.blob.size / 1024 / 1024).toFixed(1)} MB. Download and re-open it to check the encoded result.${result.fallbackReason ? ` ${result.fallbackReason}` : ''}`;
   } catch (error) {
     $('#export-status').textContent = error.name === 'AbortError' ? 'Download preparation cancelled.' : `Download could not be prepared: ${error.message}`;
   } finally {

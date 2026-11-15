@@ -6,7 +6,12 @@ export async function exportStep(run, { signal, timeoutMs = 30000, label = 'Proc
   try {
     return await Promise.race([
       Promise.resolve().then(() => { if (signal?.aborted) throw cancelled(); return run(); }),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} stopped responding for ${Math.round(timeoutMs / 1000)} seconds. Try the smaller export size or another browser.`)), timeoutMs); }),
+      new Promise((_, reject) => { timer = setTimeout(() => {
+        const error = new Error(`${label} stopped responding for ${Math.round(timeoutMs / 1000)} seconds. Try the smaller export size or another browser.`);
+        error.code = 'EXPORT_TIMEOUT';
+        error.exportStage = label;
+        reject(error);
+      }, timeoutMs); }),
       new Promise((_, reject) => { abort = () => reject(cancelled()); signal?.addEventListener('abort', abort, { once: true }); }),
     ]);
   } finally {

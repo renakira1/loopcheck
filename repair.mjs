@@ -1,4 +1,4 @@
-import { frameAt } from './loop-engine.mjs?v=export-recovery-1';
+import { frameAt } from './loop-engine.mjs?v=software-export-1';
 
 // One shared, sample-aligned timeline keeps the audio and picture in sync.
 export function repairPlan(duration, sampleRate, overlap, trimStart = 0, trimEnd = 0) {

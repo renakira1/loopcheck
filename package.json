@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test tests/loop-engine.test.mjs tests/repair.test.mjs tests/export-runtime.test.mjs",
     "test:browser": "node tests/browser.test.mjs",
-    "test:fullscreen": "node tests/fullscreen.test.mjs"
+    "test:fullscreen": "node tests/fullscreen.test.mjs",
+    "test:encoder": "node tests/windows-encoder.test.mjs"
   },
   "devDependencies": {
     "playwright-core": "1.58.2"
