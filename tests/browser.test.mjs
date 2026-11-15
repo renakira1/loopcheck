@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-import { auditRegressions } from './audit-regressions.mjs';
+import { auditRegressions, exportStallRegressions } from './audit-regressions.mjs';
 import { createServer } from 'node:http';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -163,6 +163,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#export').disabled);
   assert.match(await page.locator('#export-status').textContent(), /cancelled/);
   await auditRegressions({browser,url:`http://127.0.0.1:${server.address().port}`,temp,fixture});
+  await exportStallRegressions({browser,url:`http://127.0.0.1:${server.address().port}`,temp,fixture:largeFixture});
   assert.deepEqual(errors, []);
   console.log('Passed real MP4/AAC decoding, canvas playback over loop boundaries, controls, error recovery, mobile-width layout, and PCM boundary render.');
 } finally { await browser.close(); server.close(); await rm(temp, {recursive:true,force:true}); }

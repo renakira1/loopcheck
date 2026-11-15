@@ -86,7 +86,7 @@ export async function auditRegressions({browser,url,temp,fixture}) {
     await settle(0);
     assert.equal(await race.locator('#play').textContent(),'Play');
     assert.equal(await race.locator('#play').isDisabled(),true);
-    assert.equal(await race.locator('#export-status').textContent(),'Checking encoders…');
+    assert.match(await race.locator('#export-status').textContent(),/Checking .*encoder/);
     await cancelHeldExport();
     await startHeldExport();
     await cancelHeldExport();
@@ -125,4 +125,52 @@ export async function auditRegressions({browser,url,temp,fixture}) {
     console.log('Pending Play verified: export, cancellation, comparison, repeated Play, settings, and page visibility');
   } finally { await race.close(); }
   assert.deepEqual(errors,[]);
+}
+
+export async function exportStallRegressions({browser,url,temp,fixture}) {
+  const page=await browser.newPage();
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  try {
+    await page.goto(url);
+    await page.locator('#file').setInputFiles(fixture);
+    await page.waitForFunction(()=>!document.querySelector('#play').disabled);
+    await page.evaluate(async()=>{
+      const {VideoSampleSink}=await import('./vendor/mediabunny-1.66.0.min.mjs');
+      const original=VideoSampleSink.prototype.samples;
+      window.decodeCalls=0;
+      VideoSampleSink.prototype.samples=function(...args) {
+        const iterator=original.apply(this,args);
+        return {
+          next(){
+            if(++window.decodeCalls===4){window.decoderBlocked=true;return new Promise(()=>{});}
+            return iterator.next();
+          },
+          return(){window.readerReturned=true;return iterator.return();},
+          [Symbol.asyncIterator](){return this;},
+        };
+      };
+    });
+    await page.locator('#export').click();
+    await page.waitForFunction(()=>window.decoderBlocked);
+    assert.match(await page.locator('#export-status').textContent(),/Decoding main frame/);
+    await page.locator('#cancel-export').click();
+    await page.waitForFunction(()=>!document.querySelector('#export').disabled,null,{timeout:3000});
+    assert.match(await page.locator('#export-status').textContent(),/cancelled/);
+    assert.equal(await page.evaluate(()=>window.readerReturned),true);
+    const calls=await page.evaluate(()=>window.decodeCalls);
+    await page.locator('#export-size').selectOption('preview');
+    await page.locator('#export').click();
+    await page.waitForFunction(()=>!document.querySelector('#export').disabled,null,{timeout:60000});
+    assert.equal(await page.locator('#download').isVisible(),true,await page.locator('#export-status').textContent());
+    assert.equal(await page.evaluate(()=>window.decodeCalls),calls,'smaller export uses cached frames, avoiding the blocked decoder');
+    const event=page.waitForEvent('download');await page.locator('#download').click();
+    const download=await event;
+    const output=resolve(temp,`smaller-${download.suggestedFilename()}`);await download.saveAs(output);
+    const info=JSON.parse(execFileSync('ffprobe',['-v','error','-show_streams','-of','json',output],{encoding:'utf8'}));
+    assert.equal(info.streams[0].width,1280);
+    assert.equal(info.streams[0].height,720);
+    assert.deepEqual(errors,[]);
+    console.log('Export recovery verified: Cancel interrupts a stalled decoder; cached-preview download succeeds at 1280 × 720');
+  } finally {await page.close();}
 }

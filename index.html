@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#111411">
   <meta name="description" content="Preview, repair, and download smoother video loops. Local processing, no uploads.">
   <title>Loopcheck — Find the seam.</title>
-  <link rel="stylesheet" href="styles.css?v=audit-fixes-1">
-  <script type="module" src="app.js?v=audit-fixes-1"></script>
+  <link rel="stylesheet" href="styles.css?v=export-recovery-1">
+  <script type="module" src="app.js?v=export-recovery-1"></script>
 </head>
 <body>
   <main>
@@ -32,6 +32,7 @@
           <div class="audio-settings"><label for="audio-curve">Audio crossfade</label><select id="audio-curve"><option value="equal-power">Constant power · ambience</option><option value="linear">Linear · similar sound</option></select><label class="check-label"><input id="trim-silence" type="checkbox"> Remove detected quiet edges <span>(cuts picture too)</span></label><p id="audio-diagnostic"></p></div>
         </fieldset>
         <p id="repair-info" class="repair-info"></p>
+        <label class="export-size-label" for="export-size">Download size</label><select id="export-size"><option value="original">Original resolution</option><option value="preview">Smaller · use cached preview (faster)</option></select>
         <div class="export-row"><button id="preview-join" type="button">Play across the join ↻</button><div class="download-actions"><button id="export" class="primary" type="button">Prepare download ↗</button><button id="cancel-export" type="button" hidden>Cancel</button><a id="download" class="button primary" hidden>Download repaired video ↓</a></div></div>
         <p id="export-spec" class="quality"></p><p id="export-status" class="message" role="status" aria-live="polite"></p>
       </section>

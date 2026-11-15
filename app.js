@@ -1,8 +1,8 @@
 import { Input, BlobSource, ALL_FORMATS, CanvasSink, AudioBufferSink } from './vendor/mediabunny-1.66.0.min.mjs';
-import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=audit-fixes-1';
+import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=export-recovery-1';
 
-import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=audit-fixes-1';
-import { exportLoop } from './export-video.mjs?v=audit-fixes-1';
+import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=export-recovery-1';
+import { exportLoop } from './export-video.mjs?v=export-recovery-1';
 
 const $ = selector => document.querySelector(selector);
 const fileInput = $('#file');
@@ -353,6 +353,7 @@ $('#preview-join').addEventListener('click', () => {
   paint(transport.offset);
   play.click();
 });
+$('#export-size').addEventListener('change', invalidateDownload);
 $('#cancel-export').addEventListener('click', () => exportController?.abort());
 $('#export').addEventListener('click', async () => {
   if (!prepared || exportController) return;
@@ -361,14 +362,19 @@ $('#export').addEventListener('click', async () => {
   const controller = new AbortController();
   exportController = controller;
   $('#repair-settings').disabled = true;
+  $('#export-size').disabled = true;
   fileInput.disabled = true;
   for (const selector of ['#play', '#original', '#repaired', '#preview-join', '#export']) $(selector).disabled = true;
   $('#cancel-export').hidden = false;
   $('#export-status').textContent = 'Checking encoders…';
+  let progress = 0;
+  const smaller = $('#export-size').value === 'preview';
+  const dimensions = smaller ? { width: canvas.width, height: canvas.height } : { width: prepared.width, height: prepared.height };
   try {
     const result = await exportLoop({ file: prepared.file, plan: repairedPlan, audio: repairBuffer,
-      width: prepared.width, height: prepared.height, frameRate: prepared.frameRate, signal: controller.signal,
-      onProgress: fraction => { $('#export-status').textContent = `Rendering repaired video… ${Math.round(fraction * 100)}%`; } });
+      ...dimensions, cachedFrames: smaller ? prepared.frames : null, frameRate: prepared.frameRate, signal: controller.signal,
+      onProgress: fraction => { progress = Math.round(fraction * 100); $('#export-status').textContent = `Rendering repaired video… ${progress}%`; },
+      onStage: stage => { $('#export-status').textContent = progress ? `Rendering repaired video… ${progress}% · ${stage}` : `${stage}…`; } });
     downloadUrl = URL.createObjectURL(result.blob);
     $('#download').href = downloadUrl;
     $('#download').download = `${prepared.file.name.replace(/\.[^.]+$/, '')}-repaired.${result.extension.replace(/^\./, '')}`;
@@ -379,6 +385,7 @@ $('#export').addEventListener('click', async () => {
   } finally {
     exportController = null;
     $('#repair-settings').disabled = false;
+    $('#export-size').disabled = false;
     fileInput.disabled = false;
     for (const selector of ['#play', '#original', '#repaired', '#preview-join', '#export']) $(selector).disabled = false;
     $('#cancel-export').hidden = true;
