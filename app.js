@@ -1,8 +1,8 @@
 import { Input, BlobSource, ALL_FORMATS, CanvasSink, AudioBufferSink } from './vendor/mediabunny-1.66.0.min.mjs';
-import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=software-export-1';
+import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=lossless-1';
 
-import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=software-export-1';
-import { exportLoop } from './export-video.mjs?v=software-export-1';
+import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=lossless-1';
+import { exportLoop } from './export-video.mjs?v=lossless-1';
 
 const $ = selector => document.querySelector(selector);
 const fileInput = $('#file');
@@ -106,7 +106,7 @@ function setupEditor() {
   $('#overlap').value = Math.min(250, Math.floor(prepared.duration * 1000 / 8 / 10) * 10, maximum);
   mode = 'repaired';
   $('#editor').hidden = false;
-  $('#export-spec').textContent = `Download: ${Math.ceil(prepared.width / 2) * 2} × ${Math.ceil(prepared.height / 2) * 2} · ${prepared.frameRate.toFixed(2).replace(/\.00$/, '')} fps base cadence + dissolve frames · re-encoded locally, MP4 when supported or WebM. Mute affects preview only.`;
+  updateExportSpec();
   applyRepair();
 }
 function checkTask(current) {
@@ -353,7 +353,21 @@ $('#preview-join').addEventListener('click', () => {
   paint(transport.offset);
   play.click();
 });
-$('#export-size').addEventListener('change', invalidateDownload);
+function updateExportSpec() {
+  if (!prepared) return;
+  const lossless = $('#export-quality').value === 'lossless';
+  if (lossless) $('#export-size').value = 'original';
+  $('#export-size option[value="preview"]').disabled = lossless;
+  const smaller = $('#export-size').value === 'preview';
+  const width = Math.ceil((smaller ? canvas.width : prepared.width) / 2) * 2;
+  const height = Math.ceil((smaller ? canvas.height : prepared.height) / 2) * 2;
+  const reduced = width < Math.ceil(prepared.width / 2) * 2 || height < Math.ceil(prepared.height / 2) * 2;
+  const quality = lossless ? 'lossless VP9 + float PCM · MKV' : $('#export-quality').value === 'high' ? 'high quality · lossy MP4/WebM' : 'smaller file · lossy MP4/WebM';
+  $('#export-spec').textContent = `Download: ${width} × ${height} · ${quality} · ${prepared.frameRate.toFixed(2).replace(/\.00$/, '')} fps base cadence + dissolve frames. ` +
+    (smaller ? (reduced ? 'Reduced resolution: this discards detail. ' : 'Cached preview at source dimensions. ') : 'Original resolution. ') + 'Mute affects preview only.';
+  $('#quality-help').textContent = lossless ? 'No lossy codec fallback. Picture blending and canvas color conversion still change pixels. Large MKV files may need a compatible player such as VLC.' : 'Re-encoding is lossy, even at original resolution. High quality prioritizes detail over file size. Dissolves can still ghost.';
+}
+for (const id of ['#export-size', '#export-quality']) $(id).addEventListener('change', () => { updateExportSpec(); invalidateDownload(); });
 $('#cancel-export').addEventListener('click', () => exportController?.abort());
 $('#export').addEventListener('click', async () => {
   if (!prepared || exportController) return;
@@ -363,6 +377,7 @@ $('#export').addEventListener('click', async () => {
   exportController = controller;
   $('#repair-settings').disabled = true;
   $('#export-size').disabled = true;
+  $('#export-quality').disabled = true;
   fileInput.disabled = true;
   for (const selector of ['#play', '#original', '#repaired', '#preview-join', '#export']) $(selector).disabled = true;
   $('#cancel-export').hidden = false;
@@ -372,7 +387,7 @@ $('#export').addEventListener('click', async () => {
   const dimensions = smaller ? { width: canvas.width, height: canvas.height } : { width: prepared.width, height: prepared.height };
   try {
     const result = await exportLoop({ file: prepared.file, plan: repairedPlan, audio: repairBuffer,
-      ...dimensions, cachedFrames: smaller ? prepared.frames : null, frameRate: prepared.frameRate, signal: controller.signal,
+      ...dimensions, qualityMode: $('#export-quality').value, cachedFrames: smaller ? prepared.frames : null, frameRate: prepared.frameRate, signal: controller.signal,
       onProgress: fraction => { progress = Math.round(fraction * 100); $('#export-status').textContent = `Rendering repaired video… ${progress}%`; },
       onStage: stage => { $('#export-status').textContent = progress ? `Rendering repaired video… ${progress}% · ${stage}` : `${stage}…`; } });
     downloadUrl = URL.createObjectURL(result.blob);
@@ -386,6 +401,7 @@ $('#export').addEventListener('click', async () => {
     exportController = null;
     $('#repair-settings').disabled = false;
     $('#export-size').disabled = false;
+    $('#export-quality').disabled = false;
     fileInput.disabled = false;
     for (const selector of ['#play', '#original', '#repaired', '#preview-join', '#export']) $(selector).disabled = false;
     $('#cancel-export').hidden = true;

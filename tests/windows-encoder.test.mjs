@@ -55,6 +55,7 @@ try {
       });
     }
     await page.goto(`http://127.0.0.1:${server.address().port}`);
+  await page.locator('#export-quality').selectOption('standard',{force:true});
     await page.locator('#file').setInputFiles(file);
     await page.waitForFunction(()=>!document.querySelector('#play').disabled,null,{timeout:30000});
     await page.locator('#export').click();

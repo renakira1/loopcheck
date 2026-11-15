@@ -34,6 +34,7 @@ try {
 
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
+  await page.locator('#export-quality').selectOption('standard',{force:true});
   await page.locator('#file').setInputFiles(fixture);
   await page.waitForFunction(() => !document.querySelector('#play').disabled, {timeout:20000});
   console.log('Prepared:', await page.locator('#quality').textContent());

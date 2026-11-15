@@ -32,3 +32,10 @@ test('sequential reader preserves timestamps, lookahead, final holds, and sample
   assert.ok(samples.every(sample=>sample.closed));
   assert.equal(returned,true);
 });
+
+test('lossless has no bitrate fallback and invalid quality modes are rejected',async()=>{
+  const {encodingQuality}=await import('../encoding-quality.mjs');
+  assert.deepEqual(encodingQuality('lossless',720,1280,24),{quantizer:0});
+  assert.ok(encodingQuality('high',720,1280,24).bitrate>encodingQuality('standard',720,1280,24).bitrate);
+  assert.throws(()=>encodingQuality('unknown',720,1280,24),/Unknown export quality/);
+});

@@ -1,11 +1,13 @@
 import { Input, BlobSource, ALL_FORMATS, VideoSampleSink, Output, BufferTarget, Mp4OutputFormat,
-  WebMOutputFormat, CanvasSource, AudioBufferSource, Quality, canEncodeVideo, canEncodeAudio } from './vendor/mediabunny-1.66.0.min.mjs';
-import { blendAt, drawBlend, paintPreview } from './repair.mjs?v=software-export-1';
-import { exportFrameTimes } from './export-timeline.mjs?v=software-export-1';
+  WebMOutputFormat, MkvOutputFormat, CanvasSource, AudioBufferSource, Quality, canEncodeVideo, canEncodeAudio } from './vendor/mediabunny-1.66.0.min.mjs';
+import { blendAt, drawBlend, paintPreview } from './repair.mjs?v=lossless-1';
+import { exportFrameTimes } from './export-timeline.mjs?v=lossless-1';
 
-import { exportStep, SequentialFrameReader } from './export-runtime.mjs?v=software-export-1';
+import { exportStep, SequentialFrameReader } from './export-runtime.mjs?v=lossless-1';
 
-async function exportAttempt({ file, plan, audio, width, height, frameRate, cachedFrames = null, onProgress = () => {}, onStage = () => {}, signal, timeoutMs = 30000, webmOnly = false }) {
+import { encodingQuality } from './encoding-quality.mjs?v=lossless-1';
+
+async function exportAttempt({ file, plan, audio, width, height, frameRate, cachedFrames = null, onProgress = () => {}, onStage = () => {}, signal, timeoutMs = 30000, webmOnly = false, qualityMode = 'lossless' }) {
   const step = async (label, run) => {
     onStage(label);
     try { return await exportStep(run, { signal, timeoutMs, label }); }
@@ -14,12 +16,19 @@ async function exportAttempt({ file, plan, audio, width, height, frameRate, cach
   // Re-decode the source for export, so a reduced preview never becomes the master.
   width = Math.ceil(width / 2) * 2;
   height = Math.ceil(height / 2) * 2;
-  const videoQuality = new Quality({ bitrate: Math.min(24e6, Math.max(2e6, width * height * frameRate * 0.15)) });
+  const lossless = qualityMode === 'lossless';
+  if (lossless && cachedFrames) throw new Error('Lossless export requires Original resolution, not the reduced preview.');
+  const videoQuality = new Quality(encodingQuality(qualityMode, width, height, frameRate));
   const audioOptions = audio ? { numberOfChannels: audio.numberOfChannels, sampleRate: audio.sampleRate } : {};
   const videoOptions = { width, height, frameRate, quality: videoQuality, hardwareAcceleration: 'prefer-software', latencyMode: 'quality' };
   const check = () => { if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError'); };
   let format, videoCodec, audioCodec;
-  if (!webmOnly && await step('Checking MP4 video encoder', () => canEncodeVideo('avc', videoOptions)) && (!audio || await step('Checking AAC audio encoder', () => canEncodeAudio('aac', audioOptions)))) {
+  if (lossless) {
+    if (!await step('Checking lossless VP9 encoder', () => canEncodeVideo('vp9', videoOptions))) {
+      throw new Error('This browser does not support strict lossless VP9 export. Select High quality explicitly to allow lossy encoding.');
+    }
+    format = new MkvOutputFormat(); videoCodec = 'vp9'; audioCodec = 'pcm-f32';
+  } else if (!webmOnly && await step('Checking MP4 video encoder', () => canEncodeVideo('avc', videoOptions)) && (!audio || await step('Checking AAC audio encoder', () => canEncodeAudio('aac', audioOptions)))) {
     format = new Mp4OutputFormat(); videoCodec = 'avc'; audioCodec = 'aac';
   } else if (await step('Checking WebM video encoder', () => canEncodeVideo('vp9', videoOptions)) && (!audio || await step('Checking Opus audio encoder', () => canEncodeAudio('opus', audioOptions)))) {
     format = new WebMOutputFormat(); videoCodec = 'vp9'; audioCodec = 'opus';
@@ -77,7 +86,7 @@ async function exportAttempt({ file, plan, audio, width, height, frameRate, cach
     await step('Finalizing download', () => output.finalize());
     finalized = true;
     check();
-    return { blob: new Blob([target.buffer], { type: format.mimeType }), extension: format.fileExtension, width, height, frameRate };
+    return { blob: new Blob([target.buffer], { type: format.mimeType }), extension: format.fileExtension, width, height, frameRate, qualityMode };
   } catch (error) {
     error.videoCodec = videoCodec;
     throw error;
@@ -97,6 +106,9 @@ export async function exportLoop(options) {
   try { return await exportAttempt(options); }
   catch (error) {
     if (options.signal?.aborted || error.name === 'AbortError') throw error;
+    if ((options.qualityMode ?? 'lossless') === 'lossless') {
+      throw new Error(`Lossless export failed; no lossy fallback was used. ${error.message}`, { cause: error });
+    }
     const encodingVideo = error.exportStage?.startsWith('Encoding frame') || error.exportStage === 'Finalizing download';
     if (error.videoCodec !== 'avc' || !encodingVideo) throw error;
     // Some platform H.264 encoders accept configuration, then stop draining

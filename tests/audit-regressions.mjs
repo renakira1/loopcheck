@@ -8,6 +8,7 @@ export async function auditRegressions({browser,url,temp,fixture}) {
   page.on('pageerror',error=>errors.push(error.message));
   try {
     await page.goto(url);
+  await page.locator('#export-quality').selectOption('standard',{force:true});
     for (const [duration,rate,overlapMs] of [[3,1,250],[1,24,10]]) {
       const source=resolve(temp,`blend-${rate}.mp4`);
       const filter=`color=c=red:size=64x64:rate=${rate}:duration=${duration},drawbox=x=0:y=0:w=iw:h=ih:color=blue:t=fill:enable='gte(t,${duration/2})'`;
@@ -59,6 +60,7 @@ export async function auditRegressions({browser,url,temp,fixture}) {
       };
     });
     await race.goto(url);
+  await race.locator('#export-quality').selectOption('standard',{force:true});
     await race.locator('#file').setInputFiles(fixture);
     await race.waitForFunction(()=>!document.querySelector('#play').disabled);
     async function settle(index,fail=false) {
@@ -133,6 +135,7 @@ export async function exportStallRegressions({browser,url,temp,fixture}) {
   page.on('pageerror',error=>errors.push(error.message));
   try {
     await page.goto(url);
+  await page.locator('#export-quality').selectOption('standard',{force:true});
     await page.locator('#file').setInputFiles(fixture);
     await page.waitForFunction(()=>!document.querySelector('#play').disabled);
     await page.evaluate(async()=>{
