@@ -1,6 +1,6 @@
 # Loopcheck
 
-A small, mobile-friendly video loop workshop for GitHub Pages. Select a local clip, compare the original with a repaired loop, and download the result. Processing stays in your browser; there are no uploads, accounts, analytics, CDN requests, or build step.
+A small, mobile-friendly video loop workshop for GitHub Pages. Check and repair a local clip, or arrange multiple clips into a seamless chain preview. Processing stays in your browser; there are no uploads, accounts, analytics, CDN requests, or build step.
 
 ## Use it
 
@@ -15,6 +15,22 @@ A small, mobile-friendly video loop workshop for GitHub Pages. Select a local cl
 The repaired duration is the original duration minus any quiet-edge cuts and one overlap length. Picture and sound share that same overlap. At zero overlap, crossfades are disabled; optional quiet-edge cuts still apply.
 
 A dissolve can look natural when composition and motion nearly match. A long dissolve is not necessarily better: it may replace a hard seam with visible double images. Missing sound cannot be reconstructed; quiet-edge removal and overlapping available sound can help avoid a cutout.
+
+## Chain clips
+
+Choose **Chain clips** to build an ordered sequence alongside the existing **Check & repair** workshop.
+
+1. **Add clips** accepts multiple videos, or drop files onto the chain player. Each decoded clip is added to the library and appended to the sequence once. Files that fail to decode are reported without removing usable clips.
+2. Set **Repeats** for each sequence entry: 3 means three total plays, including the first. Use the up/down buttons to reorder entries. **Add to sequence** in the library reuses that clip later in the chain without decoding or caching it again. Removing an entry keeps its library clip; removing a library clip removes all its entries.
+3. Optionally enter **Start / End** labels, such as A and B, in the library. The app warns about mismatched adjacent entries, repeated transitions (A→B repeated would jump B→A), and the last-to-first join when looping. Labels are case-sensitive, manually supplied hints; there is no image matching or automatic sorting. Missing labels produce no warning. Warnings never prevent playback.
+4. **Play chain** previews the sequence; pause/resume retains the current position. **Restart** resets to the first entry, paused. **Loop whole chain** is enabled initially; disable it to stop at the final frame after one pass. Sequence edits and loop-mode changes reset playback. Switching workshops, hiding the page, and audio interruptions pause playback. Switching back to Check & repair also cancels any ongoing chain load.
+5. Original frames and audio are preserved: no repairs, trims, duplicate-boundary-frame removal, crossfades, or transitions are applied. Matching last/first frames are both displayed for their original durations, so an encoded duplicate can produce a brief hold. Audio cuts directly between clips and may click if endpoints differ. Clips without audio remain silent. Mixed audio formats are handled by Web Audio. Mixed video dimensions fit inside the first entry’s aspect ratio with letterboxing.
+
+For example, arrange A→A ×3, A→B ×1, B→B ×5, B→A ×1, then loop the whole chain. Repeat counts belong to sequence entries, so the same library clip can have different counts at different positions.
+
+The chain player uses timestamped cached images and audio buffers scheduled ahead on one Web Audio clock; it does not seek or replace a native video player at each join. One looping audio source covers an entry’s repetitions, and cached frames are reused. A rolling two-second scheduling horizon avoids allocating buffers for the entire repeated sequence. Display stalls warn; a scheduling underrun pauses playback for an explicit retry. This avoids silently presenting a timing fault as a source seam. Display refresh, audio resampling, device load, encoded silence, and source timing still affect the result.
+
+Chain limits: 20 library clips, 100 entries, 1–999 repeats per entry; each file must be 0.05–30 seconds and up to 100 MB. A shared 128 MiB chain cache includes decoded frames and PCM. Preview resolution adapts to the remaining budget (at most 960 pixels on the longest edge); a batch divides available space across incoming files. Decoder/transient/GPU memory is additional, and any retained single-clip repair cache is separate. Clips beyond the available cache are rejected. The current preview size is shown per clip. No footage or sequence is uploaded or saved; reloading clears the workshop. This first version previews chains only; downloads remain available for single-clip repairs.
 
 ## Hosting
 
@@ -56,7 +72,7 @@ High-quality and smaller-file modes request software video encoding in quality m
 
 ## Verification
 
-Run `npm test` (Node only) for timeline wrap, variable frame selection, PCM assembly, track offsets, trimming, crossfade continuity, clipping prevention, and pause/resume. Unit tests render a hard audio seam into a small sample-to-sample transition and verify both tracks use the same shortened period.
+Run `npm test` (Node only) for chain lookup, repeats, endpoint warnings, gapless scheduling, play-once/pause behavior, timeline wrap, variable frame selection, PCM assembly, track offsets, trimming, crossfade continuity, clipping prevention, and pause/resume. Unit tests render a hard audio seam into a small sample-to-sample transition and verify both tracks use the same shortened period.
 
 For integration tests, run `npm ci` then `npm run test:browser`. Requires FFmpeg/ffprobe with libx264 and an installed Chrome; set `CHROME_BIN` if needed. These are development tools only. Tests create temporary media and a loopback HTTP server, then clean up.
 
@@ -73,3 +89,5 @@ Export recovery tests deliberately suspend a decoder mid-export, verify Cancel r
 Run `npm run test:encoder` for a portrait H.264/stereo-AAC export regression. Optionally set `LOOPCHECK_VIDEO=/absolute/path/to/video.mp4` to use a local reproduction file; the fixture is never copied into the repository. The test also models a Windows-style video encoder whose input queue stops draining at frame 9, verifies automatic full-resolution WebM recovery, and decodes the downloaded result. Linux Chrome lacks AAC encoding, so that fault-injection scenario uses PCM audio to exercise real MP4/H.264 encoding before WebM recovery; it does not verify Windows AAC or reproduce a real Windows driver defect.
 
 Run `npm run test:lossless` (optionally with `LOOPCHECK_VIDEO`) to export, inspect every VP9 frame’s quantizer and plane-delta flags with FFmpeg trace_headers, verify float PCM and original dimensions, reopen the MKV, check accurate smaller-size summaries, and verify that unsupported strict lossless encoding never silently becomes lossy. The supplied reproduction file was used locally; no user media is committed or published.
+
+Run `npm run test:chains` for focused Chrome integration checks: multi-file decode, repeated and reused clips, actual canvas output across joins/wraps, mixed aspect ratios, audio/silent clips, ordering, removal, endpoint warnings, play-once stopping, invalid-file recovery, mobile layout, and delayed Play cancellation. OfflineAudioContext checks every output sample across repeated clips, inter-clip joins, intentional silence, and chain wraps. These verify browser scheduling, not physical speaker/display performance.

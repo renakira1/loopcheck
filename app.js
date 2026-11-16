@@ -1,8 +1,9 @@
+import { initChains } from './chain-ui.mjs?v=chains-1';
 import { Input, BlobSource, ALL_FORMATS, CanvasSink, AudioBufferSink } from './vendor/mediabunny-1.66.0.min.mjs';
-import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=lossless-1';
+import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=chains-1';
 
-import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=lossless-1';
-import { exportLoop } from './export-video.mjs?v=lossless-1';
+import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=chains-1';
+import { exportLoop } from './export-video.mjs?v=chains-1';
 
 const $ = selector => document.querySelector(selector);
 const fileInput = $('#file');
@@ -407,3 +408,20 @@ $('#export').addEventListener('click', async () => {
     $('#cancel-export').hidden = true;
   }
 });
+
+const chains = initChains();
+function switchWorkshop(chainMode) {
+  if (exportController) {
+    message.textContent = 'Cancel or finish the download preparation before switching workshops.';
+    return;
+  }
+  pause();
+  chains.pause();
+  if (!chainMode) chains.cancelLoad();
+  $('#single-workspace').hidden = chainMode;
+  $('#chain-workspace').hidden = !chainMode;
+  $('#mode-single').setAttribute('aria-pressed', String(!chainMode));
+  $('#mode-chain').setAttribute('aria-pressed', String(chainMode));
+}
+$('#mode-single').addEventListener('click', () => switchWorkshop(false));
+$('#mode-chain').addEventListener('click', () => switchWorkshop(true));

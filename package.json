@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/loop-engine.test.mjs tests/repair.test.mjs tests/export-runtime.test.mjs",
+    "test": "node --test tests/loop-engine.test.mjs tests/repair.test.mjs tests/export-runtime.test.mjs tests/chain-engine.test.mjs",
     "test:browser": "node tests/browser.test.mjs",
     "test:fullscreen": "node tests/fullscreen.test.mjs",
     "test:encoder": "node tests/windows-encoder.test.mjs",
-    "test:lossless": "node tests/lossless.test.mjs"
+    "test:lossless": "node tests/lossless.test.mjs",
+    "test:chains": "node tests/chains-browser.test.mjs"
   },
   "devDependencies": {
     "playwright-core": "1.58.2"

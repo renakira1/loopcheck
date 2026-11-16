@@ -4,16 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111411">
-  <meta name="description" content="Preview, repair, and download smoother video loops. Local processing, no uploads.">
-  <title>Loopcheck — Find the seam.</title>
-  <link rel="stylesheet" href="styles.css?v=lossless-1">
-  <script type="module" src="app.js?v=lossless-1"></script>
+  <meta name="description" content="Preview clip chains, repair video loops, and download repaired clips. Local processing, no uploads.">
+  <title>Loopcheck — Find the flow.</title>
+  <link rel="stylesheet" href="styles.css?v=chains-1">
+  <script type="module" src="app.js?v=chains-1"></script>
 </head>
 <body>
   <main>
     <header><a class="wordmark" href="./" aria-label="Loopcheck home"><span aria-hidden="true">↻</span> loopcheck</a><span class="local"><i></i> Local only</span></header>
-    <section class="intro"><p class="eyebrow">THE LOOP WORKSHOP</p><h1>Soften the seam.<br><span>Keep the moment.</span></h1><p>Blend the ending into the beginning.<br>Preview the difference. Keep the loop.</p></section>
-    <section class="workspace" aria-label="Video loop checker">
+    <section class="intro"><p class="eyebrow">THE LOOP WORKSHOP</p><h1>Find the flow.<br><span>Keep the moment.</span></h1><p>Repair a loop or build a clip chain.<br>Preview the joins. Keep the rhythm.</p></section>
+    <div class="workshop-modes comparison" role="group" aria-label="Workshop mode"><button id="mode-single" type="button" aria-pressed="true">Check &amp; repair</button><button id="mode-chain" type="button" aria-pressed="false">Chain clips</button></div>
+    <section id="single-workspace" class="workspace" aria-label="Video loop checker">
       <div id="dropzone" class="stage">
         <div id="empty" class="empty"><span class="loop-icon" aria-hidden="true">↻</span><h2>Your next endless moment.</h2><p>Drop a video here, or choose one from your device.</p><label class="button primary" for="file">Choose a video <span aria-hidden="true">↗</span></label><p class="hint">Stays on your device. Never uploaded.</p></div>
         <canvas id="video" hidden role="img" aria-label="Selected video loop preview"></canvas>
@@ -39,6 +40,31 @@
       </section>
       <p id="quality" class="quality"></p>
       <p id="message" class="message" role="status" aria-live="polite"></p>
+    </section>
+    <section id="chain-workspace" class="workspace" aria-label="Clip chain workshop" hidden>
+      <div class="chain-heading"><p class="eyebrow">BUILD A SEQUENCE</p><h2>One clip flows into the next.</h2><p>Arrange original clips, set repeats, and preview the joins. Frames and sound stay intact; matching endpoints are up to you.</p></div>
+      <div id="chain-drop" class="stage">
+        <div id="chain-empty" class="empty"><span class="loop-icon" aria-hidden="true">→</span><h2>Build your first chain.</h2><p>Choose multiple clips, or drop them here.</p><label class="button primary" for="chain-files">Add clips ↗</label></div>
+        <canvas id="chain-video" hidden role="img" aria-label="Clip chain preview"></canvas>
+      </div>
+      <input id="chain-files" type="file" accept="video/*" multiple class="file-input">
+      <div class="controls chain-controls"><div class="buttons"><button id="chain-play" type="button" disabled>Play chain</button><button id="chain-restart" type="button" disabled>Restart</button><button id="chain-mute" type="button" aria-pressed="false">Mute</button></div><label class="check-label"><input id="chain-loop" type="checkbox" checked> Loop whole chain</label></div>
+      <p id="chain-now" class="quality"></p>
+      <p id="chain-status" class="message" role="status" aria-live="polite"></p>
+      <section class="editor" aria-label="Sequence editor">
+        <div class="editor-heading"><div><p class="eyebrow">SEQUENCE</p><h2>Choose the order. Set the rhythm.</h2></div></div>
+        <p id="chain-summary"></p>
+        <ol id="chain-sequence" class="chain-list chain-sequence"></ol>
+        <ul id="chain-warnings" class="chain-warnings" aria-label="Endpoint warnings" hidden></ul>
+        <p class="quality">Repeats are total plays of an entry, including its first play. Editing the sequence resets playback. Labels only warn; they do not change footage.</p>
+      </section>
+      <section class="editor" aria-label="Clip library">
+        <div class="editor-heading"><div><p class="eyebrow">CLIP LIBRARY</p><h2>Reuse a clip anywhere.</h2></div><div class="chain-actions"><label class="button primary" for="chain-files">Add clips ↗</label><button id="chain-cancel" type="button" hidden>Cancel loading</button></div></div>
+        <p>New clips are appended to the sequence. Add them again for later appearances. Optional Start / End labels (A, B, C…) flag mismatched joins, including repeats and the chain wrap.</p>
+        <ul id="chain-library" class="chain-list"></ul>
+        <p id="chain-cache" class="quality"></p>
+        <p class="quality">Up to 20 clips, 100 sequence entries, and 999 repeats per entry. Each clip: 0.05–30 seconds, up to 100 MB. Preview resolution adapts to a shared 128 MiB chain cache. Mixed dimensions are letterboxed into the first entry’s aspect ratio. Original audio uses hard cuts; silent clips stay silent. All frames, including matching boundary frames, are preserved. Chain preview only; use Check &amp; repair for single-clip downloads. Clips and sequences stay in this tab and are cleared on reload.</p>
+      </section>
     </section>
     <footer><span>Your footage. A smoother way around.</span><details><summary>About the loop</summary><p>The full clip is decoded before playback. Cached frames follow a continuous audio clock; audio loops in one buffer, without restarting a media player. Compare the original with an end-to-start dissolve and audio crossfade. Repairs shorten the clip by the overlap length. Optional quiet-edge removal cuts picture and audio together; it may remove intentional silence. Clips must be 30 seconds or shorter and fit a 128 MB decoded cache. Preview resolution may be reduced. Downloads re-encode at the original resolution (rounded up to even dimensions), with a base cadence up to 60 fps and extra dissolve frames, using lossless VP9/PCM in MKV by default, or explicitly selected lossy MP4/WebM. Lossless codec encoding does not undo canvas color conversion, source decoding, cadence changes, or the dissolve. Source metadata and extra tracks are not retained. A dissolve may show ghosting; missing sound cannot be reconstructed. Exported codec padding or another player can still affect looping. Display refresh, device load, and silence already encoded in the file can still affect your test. Playback pauses when this page is hidden.</p><p>Decoder: Mediabunny 1.66.0 · <a href="vendor/MEDIABUNNY-LICENSE.txt">MPL 2.0 license</a> · <a href="vendor/mediabunny-1.66.0-source.tar.gz" download>Decoder source</a></p></details></footer>
   </main>
