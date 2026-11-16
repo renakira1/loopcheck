@@ -1,9 +1,9 @@
-import { initChains } from './chain-ui.mjs?v=chains-1';
+import { initChains } from './chain-ui.mjs?v=rolling-1';
 import { Input, BlobSource, ALL_FORMATS, CanvasSink, AudioBufferSink } from './vendor/mediabunny-1.66.0.min.mjs';
-import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=chains-1';
+import { copyAudioChunk, LoopTransport } from './loop-engine.mjs?v=rolling-1';
 
-import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=chains-1';
-import { exportLoop } from './export-video.mjs?v=chains-1';
+import { repairPlan, paintPreview, quietEdges, repairedAudio } from './repair.mjs?v=rolling-1';
+import { exportLoop } from './export-video.mjs?v=rolling-1';
 
 const $ = selector => document.querySelector(selector);
 const fileInput = $('#file');

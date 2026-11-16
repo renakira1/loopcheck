@@ -1,11 +1,11 @@
 import { Input, BlobSource, ALL_FORMATS, VideoSampleSink, Output, BufferTarget, Mp4OutputFormat,
   WebMOutputFormat, MkvOutputFormat, CanvasSource, AudioBufferSource, Quality, canEncodeVideo, canEncodeAudio } from './vendor/mediabunny-1.66.0.min.mjs';
-import { blendAt, drawBlend, paintPreview } from './repair.mjs?v=chains-1';
-import { exportFrameTimes } from './export-timeline.mjs?v=chains-1';
+import { blendAt, drawBlend, paintPreview } from './repair.mjs?v=rolling-1';
+import { exportFrameTimes } from './export-timeline.mjs?v=rolling-1';
 
-import { exportStep, SequentialFrameReader } from './export-runtime.mjs?v=chains-1';
+import { exportStep, SequentialFrameReader } from './export-runtime.mjs?v=rolling-1';
 
-import { encodingQuality } from './encoding-quality.mjs?v=chains-1';
+import { encodingQuality } from './encoding-quality.mjs?v=rolling-1';
 
 async function exportAttempt({ file, plan, audio, width, height, frameRate, cachedFrames = null, onProgress = () => {}, onStage = () => {}, signal, timeoutMs = 30000, webmOnly = false, qualityMode = 'lossless' }) {
   const step = async (label, run) => {

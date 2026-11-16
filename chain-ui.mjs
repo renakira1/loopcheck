@@ -1,6 +1,6 @@
-import { chainPlan, chainAt, chainWarnings, ChainTransport } from './chain-engine.mjs?v=chains-1';
-import { decodeChainClip, releaseClip } from './chain-decode.mjs?v=chains-1';
-import { frameAt } from './loop-engine.mjs?v=chains-1';
+import { chainPlan, chainAt, chainWarnings, ChainTransport } from './chain-engine.mjs?v=rolling-1';
+import { decodeChainClip, releaseClip, AUDIO_CACHE_BYTES } from './chain-decode.mjs?v=rolling-1';
+import { RollingFrameCache } from './chain-cache.mjs?v=rolling-1';
 
 export function initChains() {
   const $ = selector => document.querySelector(selector);
@@ -10,7 +10,8 @@ export function initChains() {
   const draw = canvas.getContext('2d', { alpha: false });
   const play = $('#chain-play');
   const status = $('#chain-status');
-  const limit = 128 * 1024 * 1024;
+  let cache = new RollingFrameCache();
+  let prefetchWork;
   let context, gain, transport, controller, timer, animation;
   let plan = chainPlan(entries, clips);
   let nextId = 0;
@@ -19,10 +20,11 @@ export function initChains() {
   let lastTick = 0;
   const loop = () => $('#chain-loop').checked;
   const used = () => clips.reduce((sum, clip) => sum + clip.bytes, 0);
-  function pause(message) {
+  function pause(message, keepDecoding = false) {
     request++;
     pending = false;
     transport?.pause();
+    if (!keepDecoding) { cache.suspend(); prefetchWork = null; }
     clearInterval(timer);
     cancelAnimationFrame(animation);
     play.textContent = 'Play chain';
@@ -30,23 +32,26 @@ export function initChains() {
   }
   function paint(position = 0) {
     const current = chainAt(plan, position);
+    const picture = current ? cache.frame(current.segment.clip, current.position) : { ready: true };
+    if (!picture.ready) return false;
     draw.fillStyle = '#000';
     draw.fillRect(0, 0, canvas.width, canvas.height);
     canvas.hidden = !current;
     $('#chain-empty').hidden = !!current;
-    if (!current) { $('#chain-now').textContent = ''; return; }
+    if (!current) { $('#chain-now').textContent = ''; return true; }
     const clip = current.segment.clip;
-    const frame = clip.frames[frameAt(clip.frames, current.position)]?.image;
+    const frame = picture.image;
     if (frame) {
       const scale = Math.min(canvas.width / frame.width, canvas.height / frame.height);
       const w = frame.width * scale, h = frame.height * scale;
       draw.drawImage(frame, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
     }
-    $('#chain-now').textContent = `Entry ${current.index + 1} of ${entries.length} · ${clip.name} · repeat ${current.repetition + 1}/${current.segment.repeats} · ${position.toFixed(1)} / ${plan.duration.toFixed(1)}s`;
+    $('#chain-now').textContent = `Entry ${current.index + 1} of ${entries.length} · ${clip.name} · repeat ${current.repetition + 1}/${current.segment.repeats} · ${position.toFixed(1)} / ${plan.duration.toFixed(1)}s · ${clip.width} × ${clip.height} preview`;
     [...$('#chain-sequence').children].forEach((row, i) => {
       if (i === current.index) row.setAttribute('aria-current', 'step');
       else row.removeAttribute('aria-current');
     });
+    return true;
   }
   function warnings() {
     const list = $('#chain-warnings');
@@ -60,18 +65,51 @@ export function initChains() {
   }
   function refresh() {
     pause();
+    cache.dispose();
+    cache = new RollingFrameCache();
     plan = chainPlan(entries, clips);
     transport?.configure(plan, loop());
     const first = plan.segments[0]?.clip;
-    if (first) { canvas.width = first.width; canvas.height = first.height; }
+    if (first) {
+      // Preserve the first entry's aspect, using the largest requested preview
+      // edge. A tiny first clip must not set the chain's output resolution.
+      const longest = Math.max(...plan.segments.map(({ clip }) => Math.max(clip.width, clip.height)));
+      const scale = longest / Math.max(first.width, first.height);
+      canvas.width = Math.round(first.width * scale);
+      canvas.height = Math.round(first.height * scale);
+    }
     play.disabled = !entries.length;
     $('#chain-restart').disabled = !entries.length;
     $('#chain-summary').textContent = entries.length ?
       `${entries.length} entries · ${entries.reduce((sum, entry) => sum + entry.repeats, 0)} clip plays · ${plan.duration.toFixed(2)}s per pass` :
       'Add clips below to build a sequence.';
-    $('#chain-cache').textContent = `${clips.length}/20 clips · ${(used() / 1024 / 1024).toFixed(1)} / 128 MiB preview cache`;
+    cacheInfo();
     warnings();
-    paint();
+    if (plan.duration) {
+      const currentCache = cache;
+      const ticket = request;
+      canvas.hidden = false;
+      $('#chain-empty').hidden = true;
+      draw.fillStyle = '#000'; draw.fillRect(0, 0, canvas.width, canvas.height);
+      $('#chain-now').textContent = 'Preparing sharp preview…';
+      currentCache.update(plan, 0, loop()).then(() => {
+        if (cache === currentCache && ticket === request) { paint(); cacheInfo(); }
+      }).catch(error => {
+        if (error.name !== 'AbortError' && cache === currentCache && ticket === request) status.textContent = error.message;
+      });
+    } else paint();
+  }
+  function cacheInfo() {
+    $('#chain-cache').textContent = `${clips.length}/20 clips · ${(used() / 1024 / 1024).toFixed(1)} / 64 MiB audio · ${(cache.bytes / 1024 / 1024).toFixed(1)} / 128 MiB rolling video · up to 1280 px, independent of library size`;
+  }
+  function prefetch(position) {
+    const currentCache = cache;
+    const work = cache.update(plan, position, loop());
+    if (prefetchWork === work) return;
+    prefetchWork = work;
+    work.then(() => { if (cache === currentCache) cacheInfo(); }).catch(error => {
+      if (error.name !== 'AbortError' && cache === currentCache) pause(error.message);
+    });
   }
   function button(text, label, action) {
     const button = document.createElement('button');
@@ -107,7 +145,7 @@ export function initChains() {
       const name = document.createElement('strong');
       name.textContent = clip.name;
       const detail = document.createElement('small');
-      detail.textContent = `${clip.duration.toFixed(2)}s · ${clip.width} × ${clip.height} preview · ${clip.audio ? 'original audio' : 'silent'}`;
+      detail.textContent = `${clip.duration.toFixed(2)}s · ${clip.width} × ${clip.height} preview (${clip.sourceWidth} × ${clip.sourceHeight} source) · ${clip.audio ? 'original audio' : 'silent'}`;
       info.append(name, detail);
       const labels = document.createElement('div');
       labels.className = 'chain-labels';
@@ -188,11 +226,10 @@ export function initChains() {
     const failures = [];
     let added = 0;
     try {
-      for (const [index, file] of files.entries()) {
+      for (const file of files) {
         if (current.signal.aborted) break;
         if (clips.length >= 20) { failures.push('Library limit: 20 clips.'); break; }
-        // Reserve room across this batch rather than letting its first file use it all.
-        const budget = Math.floor((limit - used()) / Math.min(files.length - index, 20 - clips.length));
+        const budget = AUDIO_CACHE_BYTES - used();
         try {
           const clip = await decodeChainClip(file, budget, current.signal, percent => {
             status.textContent = `Decoding ${file.name}… ${percent}%`;
@@ -227,15 +264,22 @@ export function initChains() {
     if (lastTick && now - lastTick > 100) status.textContent = 'Display stalled. Replay before judging the joins.';
     lastTick = now;
     const position = transport.position(true);
-    paint(position);
+    if (!paint(position)) {
+      // Freeze picture and sound together. Resume at the missing position;
+      // decoding never silently skips ahead or lowers resolution.
+      pause('Buffering sharp preview…', true);
+      transport.offset = position;
+      startPlayback(true);
+      return;
+    }
+    prefetch(position);
     if (!loop() && position >= plan.duration) { pause('Chain finished. Press Play chain to replay.'); return; }
     animation = requestAnimationFrame(render);
   }
-  play.addEventListener('click', async () => {
-    if (transport?.running || pending) { pause('Paused. Press Play chain to resume.'); return; }
+  async function startPlayback(buffering = false) {
     if (!plan.duration) return;
     const ticket = ++request;
-    pending = true; play.textContent = 'Starting…';
+    pending = true; play.textContent = buffering ? 'Buffering…' : 'Starting…';
     try {
       if (!context) {
         context = new AudioContext();
@@ -250,6 +294,12 @@ export function initChains() {
       await context.resume();
       if (ticket !== request || document.hidden) return;
       if (context.state !== 'running') throw new Error('Audio is suspended. Press Play chain again.');
+      const position = transport.offset >= plan.duration ? 0 : transport.offset;
+      status.textContent = 'Preparing sharp preview…';
+      await cache.update(plan, position, loop());
+      if (ticket !== request || document.hidden) return;
+      if (context.state !== 'running') throw new Error('Audio was interrupted. Press Play chain again.');
+      paint(position); cacheInfo();
       transport.start();
       timer = setInterval(() => {
         if (transport.elapsed() > transport.next && (loop() || transport.next < plan.duration)) {
@@ -269,6 +319,10 @@ export function initChains() {
     } finally {
       if (ticket === request) { pending = false; if (!transport?.running) play.textContent = 'Play chain'; }
     }
+  }
+  play.addEventListener('click', () => {
+    if (transport?.running || pending) { pause('Paused. Press Play chain to resume.'); return; }
+    startPlayback();
   });
   $('#chain-mute').addEventListener('click', () => {
     const muted = $('#chain-mute').getAttribute('aria-pressed') !== 'true';

@@ -1,3 +1,4 @@
+import { rollingChecks } from './rolling-browser.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
@@ -13,10 +14,12 @@ for (const [path, color, rate, sound] of [[red, 'red', 24, true], [blue, 'blue',
     ...(sound ? ['-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100:duration=0.5'] : []),
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', ...(sound ? ['-c:a', 'aac', '-shortest'] : ['-an']), '-y', path]);
 }
+const high = resolve(temp, 'high.mp4');
+execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=4', '-c:v', 'libx264', '-g', '90', '-bf', '3', '-pix_fmt', 'yuv420p', '-an', '-y', high]);
 const server = createServer(async (req, res) => {
   try {
-    const path = resolve(root, '.' + (req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]));
-    if (!path.startsWith(root + '/')) { res.writeHead(403).end(); return; }
+    const path = req.url === '/__fixture/high.mp4' ? high : resolve(root, '.' + (req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]));
+    if (path !== high && !path.startsWith(root + '/')) { res.writeHead(403).end(); return; }
     res.setHeader('Content-Type', ({ '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' })[extname(path)] || 'application/octet-stream');
     res.end(await readFile(path));
   } catch { res.writeHead(404).end(); }
@@ -120,6 +123,7 @@ try {
   });
   assert.ok(maxError < 1e-6, `gapless PCM error ${maxError}`);
   assert.deepEqual(errors, []);
+  await rollingChecks(browser, `http://127.0.0.1:${server.address().port}`, high, red);
   console.log('Chain browser checks passed: decoding, repeats, joins, wraps, stop, ordering, removal, labels, errors, mobile, stale Play, sample-exact audio.');
 } finally {
   await browser.close();

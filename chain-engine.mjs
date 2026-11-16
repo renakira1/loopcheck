@@ -1,4 +1,4 @@
-import { loopPosition } from './loop-engine.mjs?v=chains-1';
+import { loopPosition } from './loop-engine.mjs?v=rolling-1';
 
 export function chainPlan(entries, clips) {
   let duration = 0;
